@@ -52,6 +52,7 @@ pub struct IncludedLicenseAttributes {
     pub name: Option<String>,
     pub key: String,
     pub expiry: String,
+    pub created: String,
     pub metadata: serde_json::Value,
 }
 

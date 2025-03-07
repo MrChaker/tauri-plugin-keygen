@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct License {
-    #[serde(skip_serializing)]
     pub id: String,
     pub policy_id: String,
     pub key: String,
@@ -20,6 +19,7 @@ pub struct License {
     pub entitlements: Vec<String>,
     pub metadata: serde_json::Value,
     pub valid: bool,
+    pub created: String,
 }
 
 impl License {
@@ -63,6 +63,7 @@ impl License {
                     metadata: lic_data.attributes.metadata,
                     entitlements,
                     valid: lic_res.meta.valid,
+                    created: lic_data.attributes.created,
                 })
             }
             None => None,
@@ -107,6 +108,7 @@ impl License {
                     entitlements: entitlement_codes,
                     metadata: included_lic.attributes.metadata,
                     valid: true,
+                    created: included_lic.attributes.created,
                 }
             })
             .map_or(Ok(None), |license| Ok(Some(license)))

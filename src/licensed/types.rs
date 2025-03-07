@@ -30,6 +30,7 @@ pub struct LicenseAttributes {
     pub name: Option<String>,
     pub key: String,
     pub expiry: Option<String>,
+    pub created: String,
     pub metadata: serde_json::Value,
 }
 
