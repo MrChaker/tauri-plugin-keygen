@@ -12,7 +12,7 @@ use reqwest::{
 use serde::{Deserialize, Serialize};
 use sig::KeygenSig;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KeygenClient {
     custom_domain: Option<String>,
     account_id: Option<String>,

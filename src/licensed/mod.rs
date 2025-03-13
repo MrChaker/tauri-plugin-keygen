@@ -12,13 +12,19 @@ use license::*;
 use reqwest::{Method, StatusCode};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use sqlx::{sqlite::SqliteRow, Row};
+use sqlx::{
+    sqlite::{SqliteConnectOptions, SqlitePoolOptions},
+    Pool,
+};
 use std::{
+    env,
     fs::{self, File},
     io::Write,
     path::PathBuf,
     time::Duration,
 };
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Env, Manager, Runtime};
 use types::*;
 
 #[derive(Debug, Serialize, Default, Clone)]
@@ -27,12 +33,13 @@ pub struct LicensedState {
 }
 
 impl LicensedState {
-    pub(crate) fn load<R: Runtime>(
+    pub(crate) async fn load<R: Runtime>(
         app: &AppHandle<R>,
         client: &KeygenClient,
         machine: &Machine,
+        db_name: &str,
     ) -> Result<Self> {
-        if let Some(key) = Self::get_cached_license_key(app)? {
+        if let Some(key) = Self::get_cached_license_key(app, db_name).await? {
             // load from machine file
             match machine.load_machine_file(&key, client, app) {
                 Ok(Some(machine_license)) => match License::from_machine_license(machine_license) {
@@ -163,25 +170,59 @@ impl LicensedState {
     }
 
     pub(crate) fn cache_license_key<R: Runtime>(key: &String, app: &AppHandle<R>) -> Result<()> {
-        let path = Self::get_license_key_cache_path(app)?;
+        // let path = Self::get_license_key_cache_path(app)?;
 
-        let mut f = File::create(path)?;
-        f.write_all(key.as_bytes())?;
+        // let mut f = File::create(path)?;
+        // f.write_all(key.as_bytes())?;
 
         Ok(())
     }
 
-    pub(crate) fn get_cached_license_key<R: Runtime>(app: &AppHandle<R>) -> Result<Option<String>> {
-        let path = Self::get_license_key_cache_path(app)?;
+    // get key from db not cache file
+    pub(crate) async fn get_cached_license_key<R: Runtime>(
+        app: &AppHandle<R>,
+        db_name: &str,
+    ) -> Result<Option<String>> {
+        let db_key = env::var("DATABASE_KEY").expect("Failed to get db key");
 
-        // no license key
-        if !path.exists() {
+        let db_path = app.path().app_config_dir().unwrap();
+
+        let database_url = format!("{}/{}", db_path.display(), db_name);
+
+        let opts = SqliteConnectOptions::new()
+            .filename(database_url)
+            .pragma("key", db_key);
+
+        // use in a pool
+
+        // Create a connection pool
+        let pool: std::result::Result<Pool<sqlx::sqlite::Sqlite>, sqlx::Error> =
+            Pool::connect_with(opts).await;
+        if pool.is_err() {
+            println!("error: {:?}", pool);
             return Ok(None);
+        };
+
+        struct row {
+            id: String,
+            key: String,
+        }
+        // Perform a query
+        let rows: std::result::Result<Vec<SqliteRow>, sqlx::Error> =
+            sqlx::query("SELECT id, key FROM license_key")
+                .fetch_all(&pool.unwrap())
+                .await;
+        if rows.is_err() {
+            return Ok(None);
+        };
+
+        let mut key = None;
+        // Iterate over the results
+        for row in rows.unwrap() {
+            key = Some(row.get::<String, &str>("key"));
         }
 
-        let key = fs::read_to_string(path)?;
-
-        Ok(Some(key))
+        Ok(key)
     }
 
     pub(crate) fn remove_cached_license_key<R: Runtime>(app: &AppHandle<R>) -> Result<()> {

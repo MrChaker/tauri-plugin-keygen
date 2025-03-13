@@ -32,7 +32,7 @@ static ENGINE_NAME: &str = "WebKit";
 #[cfg(target_os = "windows")]
 static ENGINE_NAME: &str = "WebView2";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Machine {
     pub fingerprint: String,
     pub name: String,

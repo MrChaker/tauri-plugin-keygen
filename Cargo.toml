@@ -30,6 +30,13 @@ hex = "0.4.3"
 chrono = "0.4.31"
 aes-gcm = "0.9"
 tauri-plugin-os = "2.0.1"
+sqlx = { version = "0.8", features = [ "json", "time" ] }
+libsqlite3-sys = "*"
+
+[features]
+sqlite = [ "sqlx/sqlite", "sqlx/runtime-tokio" ]
+bundled-sqlcipher = ["sqlite","libsqlite3-sys/bundled-sqlcipher"]
+bundled-sqlcipher-vendored-openssl = ["sqlite","libsqlite3-sys/bundled-sqlcipher-vendored-openssl"]
 
 [build-dependencies]
 tauri-plugin = { version = "2.0.1", features = ["build"] }

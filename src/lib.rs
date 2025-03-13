@@ -24,10 +24,15 @@ pub struct Builder {
     pub verify_key: String,
     pub version_header: Option<String>,
     pub cache_lifetime: i64, // in minutes
+    pub db_name: String,
 }
 
 impl Builder {
-    pub fn new(account_id: impl Into<String>, verify_key: impl Into<String>) -> Self {
+    pub fn new(
+        account_id: impl Into<String>,
+        verify_key: impl Into<String>,
+        db_name: impl Into<String>,
+    ) -> Self {
         Self {
             custom_domain: None,
             api_url: Some("https://api.keygen.sh".into()),
@@ -35,12 +40,14 @@ impl Builder {
             verify_key: verify_key.into(),
             version_header: None,
             cache_lifetime: 240,
+            db_name: db_name.into(),
         }
     }
 
     pub fn with_custom_domain(
         custom_domain: impl Into<String>,
         verify_key: impl Into<String>,
+        db_name: impl Into<String>,
     ) -> Self {
         Self {
             custom_domain: Some(custom_domain.into()),
@@ -49,6 +56,7 @@ impl Builder {
             verify_key: verify_key.into(),
             version_header: None,
             cache_lifetime: 240,
+            db_name: db_name.into(),
         }
     }
 
@@ -99,18 +107,23 @@ impl Builder {
                     machine.user_agent.clone(),
                 );
 
+                app.manage(Mutex::new(machine.clone()));
+                app.manage(Mutex::new(keygen_client.clone()));
+
                 // init state
-                match LicensedState::load(app, &keygen_client, &machine) {
-                    Ok(licensed_state) => {
-                        app.manage(Mutex::new(licensed_state));
+                tauri::async_runtime::block_on(async move {
+                    match LicensedState::load(app, &keygen_client, &machine, self.db_name.as_str())
+                        .await
+                    {
+                        Ok(licensed_state) => {
+                            app.manage(Mutex::new(licensed_state));
+                        }
+                        Err(err) => {
+                            dbg!(err);
+                            app.manage(Mutex::new(LicensedState::default()));
+                        }
                     }
-                    Err(err) => {
-                        dbg!(err);
-                        app.manage(Mutex::new(LicensedState::default()));
-                    }
-                }
-                app.manage(Mutex::new(machine));
-                app.manage(Mutex::new(keygen_client));
+                });
 
                 Ok(())
             })
